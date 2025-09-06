@@ -33,8 +33,3 @@ This project demonstrates a production-ready DevOps pipeline with:
 5. Access Grafana (via port-forward or LoadBalancer from EKS).
 
 ---
-
-## Resume Bullets
-- Built and deployed a scalable Flask microservice on AWS ECS Fargate and EKS using Terraform and GitHub Actions.
-- Automated CI/CD pipelines with Docker image builds, ECR integration, and Terraform-managed infrastructure deployments.
-- Implemented monitoring with Prometheus and Grafana for observability of microservices.
