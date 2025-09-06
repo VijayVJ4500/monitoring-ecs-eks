@@ -33,3 +33,7 @@ This project demonstrates a production-ready DevOps pipeline with:
 5. Access Grafana (via port-forward or LoadBalancer from EKS).
 
 ---
+
+
+<img width="1536" height="1024" alt="ChatGPT Image Sep 6, 2025, 12_55_07 PM" src="https://github.com/user-attachments/assets/4a98d81a-ce9a-4b40-aaf7-fea93e9dc2c4" />
+
