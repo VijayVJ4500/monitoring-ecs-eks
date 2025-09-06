@@ -1,4 +1,4 @@
-# Project A - Scalable Microservice on AWS (ECS + EKS + Monitoring)
+# Project  - Scalable Microservice on AWS (ECS + EKS + Monitoring)
 
 This project demonstrates a production-ready DevOps pipeline with:
 - Flask microservice containerized with Docker
