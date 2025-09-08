@@ -1,4 +1,4 @@
-name: CI/CD
+name: CI/CD to ECS
 
 on:
   push:
@@ -7,6 +7,12 @@ on:
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
+    env:
+      ECR_REPO_NAME: project-ecs-cicd-repo
+      ECS_CLUSTER: project-ecs-cicd-cluster
+      ECS_SERVICE: project-ecs-cicd-service
+      CONTAINER_NAME: project-ecs-cicd-container   # must match container name in task definition
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -25,30 +31,49 @@ jobs:
 
       - name: Build Docker image
         run: |
-          docker build -t project-ecs-cicd-repo .
+          docker build -t $ECR_REPO_NAME .
 
       - name: Tag & push image to ECR
         run: |
-          # Tag with commit SHA
-          docker tag project-ecs-cicd-repo:latest ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/project-ecs-cicd-repo:${{ github.sha }}
+          IMAGE_URI=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/$ECR_REPO_NAME:${{ github.sha }}
+          LATEST_URI=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/$ECR_REPO_NAME:latest
           
-          # Tag with latest
-          docker tag project-ecs-cicd-repo:latest ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/project-ecs-cicd-repo:latest
+          docker tag $ECR_REPO_NAME:latest $IMAGE_URI
+          docker tag $ECR_REPO_NAME:latest $LATEST_URI
           
-          # Push both
-          docker push ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/project-ecs-cicd-repo:${{ github.sha }}
-          docker push ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/project-ecs-cicd-repo:latest
+          docker push $IMAGE_URI
+          docker push $LATEST_URI
 
-      - name: Update ECS service
-        env:
-          CLUSTER_NAME: project-ecs-cicd-cluster
-          SERVICE_NAME: project-ecs-cicd-service
-          REGION: ${{ secrets.AWS_REGION }}
-          ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+          echo "IMAGE_URI=$IMAGE_URI" >> $GITHUB_ENV
+
+      - name: Register new ECS task definition revision
         run: |
-          echo "Updating ECS service to use the latest image..."
+          # Get the current task definition
+          TASK_DEF_JSON=$(aws ecs describe-task-definition \
+            --task-definition $ECS_SERVICE \
+            --region ${{ secrets.AWS_REGION }})
+          
+          # Replace the image in the container definition
+          NEW_TASK_DEF=$(echo $TASK_DEF_JSON | jq \
+            --arg IMAGE "$IMAGE_URI" \
+            --arg NAME "$CONTAINER_NAME" \
+            '.taskDefinition | .containerDefinitions[0].image=$IMAGE | .containerDefinitions[0].name=$NAME | {family: .family, containerDefinitions: .containerDefinitions, networkMode, executionRoleArn, taskRoleArn, requiresCompatibilities, cpu, memory}')
+
+          echo "$NEW_TASK_DEF" > new-task-def.json
+
+          # Register new revision
+          NEW_REVISION=$(aws ecs register-task-definition \
+            --cli-input-json file://new-task-def.json \
+            --query "taskDefinition.taskDefinitionArn" \
+            --output text)
+
+          echo "NEW_REVISION=$NEW_REVISION" >> $GITHUB_ENV
+
+      - name: Update ECS service to use new revision
+        run: |
           aws ecs update-service \
-            --cluster $CLUSTER_NAME \
-            --service $SERVICE_NAME \
-            --force-new-deployment \
-            --region $REGION
+            --cluster $ECS_CLUSTER \
+            --service $ECS_SERVICE \
+            --task-definition $NEW_REVISION \
+            --region ${{ secrets.AWS_REGION }} \
+            --force-new-deployment
