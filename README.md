@@ -31,7 +31,6 @@ Terraform ──► VPC, ECS, ECR, ALB, IAM, CloudWatch
 yaml
 Copy code
 
-👉 Draw this visually in **[draw.io / diagrams.net](https://app.diagrams.net/)** using AWS architecture icons.  
 Show:
 - User traffic → ALB → ECS tasks  
 - ECS writing to CloudWatch logs  
